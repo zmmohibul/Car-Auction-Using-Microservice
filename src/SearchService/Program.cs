@@ -1,22 +1,13 @@
-using System;
-using AuctionService.Data;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using MongoDB.Driver;
+using MongoDB.Entities;
+using SearchService.Data;
+using SearchService.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-builder.Services.AddDbContext<AuctionDbContext>(opt =>
-{
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
-});
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -30,18 +21,28 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseHttpsRedirection();
+
 app.UseAuthorization();
 
 app.MapControllers();
 
+await DB.InitAsync("SearchDb", MongoClientSettings
+    .FromConnectionString(builder.Configuration.GetConnectionString("MongoDbConnection")));
+
+await DB.Index<Item>()
+    .Key(item => item.Make, KeyType.Text )
+    .Key(item => item.Model, KeyType.Text)
+    .Key(item => item.Color, KeyType.Text)
+    .CreateAsync();
+
 try
 {
-    DbInitializer.InitDb(app);
+    await DbInitializer.InitDb(app);
 }
 catch (Exception e)
 {
     Console.WriteLine(e);
-    throw;
 }
 
 app.Run();
